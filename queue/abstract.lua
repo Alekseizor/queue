@@ -62,7 +62,7 @@ local function tube_release_all_orphaned_tasks(tube)
         }
         if taken and session.exist_shared(taken[4]) then
             log.info(prefix ..
-                ('skipping task: %d, tube_id: %d'):format(task[1],
+                ('skipping task: %s, tube_id: %d'):format(task[1],
                     tube.tube_id))
         else
             tube.raw:release(task[1], {})

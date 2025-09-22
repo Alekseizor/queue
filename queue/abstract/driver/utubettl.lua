@@ -221,10 +221,10 @@ local function utubettl_fiber_iteration(self, processed)
             if self.ready_space_mode then
                 update_ready(self, task[i_id], task[i_utube], task[i_pri])
             end
+            self:on_task_change(task, 'delayed')
             commit_func()
             commited = true
 
-            self:on_task_change(task, 'delayed')
             estimated = 0
             processed = processed + 1
         else
@@ -265,10 +265,10 @@ local function utubettl_fiber_iteration(self, processed)
             if self.ready_space_mode then
                 put_ready(self, task[i_id], task[i_utube], task[i_pri])
             end
+            self:on_task_change(task, 'ttr')
             commit_func()
             commited = true
 
-            self:on_task_change(task, 'ttr')
             estimated = 0
             processed = processed + 1
         else
@@ -450,9 +450,9 @@ function method.put(self, data, opts)
         put_ready(self, task[i_id], task[i_utube], task[i_pri])
     end
 
+    self:on_task_change(task, 'put')
     commit_func()
 
-    self:on_task_change(task, 'put')
     return task
 end
 
@@ -515,13 +515,13 @@ local function take_ready(self)
             end
         end
 
-        commit_func()
-
         if take_complete then
             self:on_task_change(task, 'take')
+            commit_func()
             return task
         elseif take_ttl then
             self:on_task_change(task, 'ttl')
+            commit_func()
         end
     end
 end
@@ -554,11 +554,13 @@ local function take(self)
                 take_complete = true
             end
 
-            commit_func()
             if take_complete then
                 self:on_task_change(t, 'take')
+                commit_func()
                 return t
             end
+
+            commit_func()
         end
     end
 end
@@ -607,11 +609,13 @@ function method.delete(self, id)
         commit_func()
 
         if is_taken then
-            return process_neighbour(self, task, 'delete')
+            task = process_neighbour(self, task, 'delete')
         else
             self:on_task_change(task, 'delete')
-            return task
         end
+
+        commit_func()
+        return task
     end
 
     commit_func()
@@ -637,9 +641,10 @@ function method.release(self, id, opts)
                 put_next_ready(self, task[i_utube])
             end
 
+            task = process_neighbour(self, task, 'release')
             commit_func()
 
-            return process_neighbour(self, task, 'release')
+            return task
         end
     else
         task = self.space:update(id, {
@@ -652,8 +657,8 @@ function method.release(self, id, opts)
         end
     end
 
-    commit_func()
     self:on_task_change(task, 'release')
+    commit_func()
     return task
 end
 
@@ -684,11 +689,12 @@ function method.bury(self, id)
         end
     end
 
+    task = process_neighbour(
+            self, task:transform(i_status, 1, state.BURIED), 'bury'
+    )
     commit_func()
 
-    return process_neighbour(
-        self, task:transform(i_status, 1, state.BURIED), 'bury'
-    )
+    return task
 end
 
 -- unbury several tasks
@@ -713,9 +719,8 @@ function method.kick(self, count)
             update_ready(self, task[i_id], task[i_utube], task[i_pri])
         end
 
-        commit_func()
-
         self:on_task_change(task, 'kick')
+        commit_func()
     end
     return count
 end
